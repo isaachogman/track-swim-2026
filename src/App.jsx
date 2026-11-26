@@ -66,9 +66,26 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) { setAuthReady(true); return; }
-    supabase.auth.getSession().then(({data})=>{setSession(data.session);setAuthReady(true)});
-    const { data } = supabase.auth.onAuthStateChange((_event, next)=>setSession(next));
-    return ()=>data.subscription.unsubscribe();
+
+    // Render the sign-in/demo screen immediately. Session restoration can
+    // take time on mobile networks, so it must not block the whole app.
+    setAuthReady(true);
+    let active = true;
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (active && !error) setSession(data.session);
+      })
+      .catch(() => {
+        // Keep the sign-in and interactive demo available if session restore fails.
+      });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (active) setSession(next);
+    });
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
   }, []);
   async function loadData() {
     if (!session?.user || demoMode) return;
