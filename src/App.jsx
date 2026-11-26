@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDownRight, ArrowUpRight, Award, CalendarDays, Check, ChevronDown, Clock3, Droplets, Gauge, LogOut, Plus, Target, Timer, Waves, X } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
-const tabs = ['Overview', 'Workouts', 'Best Times', 'Goals'];
+const tabs = ['Overview', 'Workouts', 'Best Times', 'Meet Results', 'Goals'];
 const fmt = (seconds) => {
   if (seconds == null) return '—';
   const n = Number(seconds), m = Math.floor(n / 60), s = (n % 60).toFixed(2).padStart(5, '0');
@@ -52,6 +52,8 @@ export default function App() {
   const [sessions, setSessions] = useState([]);
   const [bests, setBests] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [meetResults, setMeetResults] = useState([]);
+  const [meetImport, setMeetImport] = useState({ source_name:'MaxPreps', source_url:'', rows:'' });
   const [modal, setModal] = useState('');
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState('');
@@ -67,13 +69,14 @@ export default function App() {
   }, []);
   async function loadData() {
     if (!session?.user) return;
-    const [s,b,g] = await Promise.all([
+    const [s,b,g,m] = await Promise.all([
       supabase.from('swim_sessions').select('*').order('swim_date',{ascending:false}).limit(100),
       supabase.from('personal_bests').select('*').order('achieved_on',{ascending:false}),
-      supabase.from('swim_goals').select('*').order('created_at',{ascending:false})
+      supabase.from('swim_goals').select('*').order('created_at',{ascending:false}),
+      supabase.from('meet_results').select('*').order('meet_date',{ascending:false}).limit(200)
     ]);
-    if (s.error || b.error || g.error) setToast((s.error||b.error||g.error).message);
-    setSessions(s.data||[]); setBests(b.data||[]); setGoals(g.data||[]);
+    if (s.error || b.error || g.error || m.error) setToast((s.error||b.error||g.error||m.error).message);
+    setSessions(s.data||[]); setBests(b.data||[]); setGoals(g.data||[]); setMeetResults(m.data||[]);
   }
   useEffect(()=>{loadData()},[session]);
   const totalYards = sessions.reduce((n,s)=>n+Number(s.distance_yards||0),0);
@@ -86,6 +89,40 @@ export default function App() {
     return {day:d.toLocaleDateString(undefined,{weekday:'short'}), yards:sessions.filter(s=>s.swim_date===key).reduce((n,s)=>n+Number(s.distance_yards),0)};
   }),[sessions]);
   const maxBar = Math.max(1,...weekBars.map(x=>x.yards));
+  function parseSwimTime(value) {
+    const raw = String(value||'').trim();
+    if (!raw) return NaN;
+    if (raw.includes(':')) { const parts=raw.split(':'); return Number(parts[0])*60+Number(parts[1]); }
+    return Number(raw);
+  }
+  async function importMeetResults(e) {
+    e.preventDefault();
+    const lines = meetImport.rows.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+    const parsed = lines.map(line => {
+      const parts = line.split(',').map(x=>x.trim());
+      return { event:parts[0], time_seconds:parseSwimTime(parts[1]), course:(parts[2]||'SCY').toUpperCase(), meet_date:parts[3]||new Date().toISOString().slice(0,10), meet_name:parts[4]||'Swim meet', source_name:meetImport.source_name||'Other', source_url:meetImport.source_url||null };
+    });
+    if (!parsed.length || parsed.some(x=>!x.event || !Number.isFinite(x.time_seconds) || x.time_seconds<=0 || !['SCY','SCM','LCM'].includes(x.course) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(x.meet_date))) {
+      setToast('Check the pasted rows. Use: Event, Time, Course, YYYY-MM-DD, Meet name'); return;
+    }
+    setBusy(true);
+    for (const item of parsed) {
+      const {error}=await supabase.from('meet_results').insert({...item,user_id:session.user.id});
+      if (error) { setBusy(false); setToast(error.message); return; }
+      const existing = bests.filter(b=>b.event.toLowerCase()===item.event.toLowerCase() && b.course===item.course).sort((a,b)=>Number(a.time_seconds)-Number(b.time_seconds))[0];
+      if (!existing || item.time_seconds < Number(existing.time_seconds)) {
+        if (existing) {
+          const {error:updateError}=await supabase.from('personal_bests').update({time_seconds:item.time_seconds,achieved_on:item.meet_date}).eq('id',existing.id);
+          if (updateError) { setBusy(false); setToast(updateError.message); return; }
+        } else {
+          const {error:insertError}=await supabase.from('personal_bests').insert({user_id:session.user.id,event:item.event,course:item.course,time_seconds:item.time_seconds,achieved_on:item.meet_date});
+          if (insertError) { setBusy(false); setToast(insertError.message); return; }
+        }
+      }
+    }
+    setBusy(false); setModal(''); setMeetImport({...meetImport,rows:''}); await loadData(); setToast(parsed.length+' meet result(s) imported. Personal bests updated automatically.');
+    setTimeout(()=>setToast(''),4500);
+  }
   async function save(table, value, reset) {
     setBusy(true); const {error}=await supabase.from(table).insert({...value,user_id:session.user.id});
     setBusy(false); if(error){setToast(error.message);return;}
@@ -97,7 +134,7 @@ export default function App() {
   if (!session) return <AuthScreen />;
   return <div className="app-shell">
     <aside className="sidebar"><div className="brand"><div className="brand-mark small"><Waves size={19}/></div><span>lane<span className="brand-light">line</span></span></div>
-      <div className="side-label">WORKSPACE</div><nav>{tabs.map((t,i)=><button key={t} className={tab===t?'nav-item active':'nav-item'} onClick={()=>setTab(t)}>{[<Gauge/>,<Activity/>,<Award/>,<Target/>][i]}<span>{t}</span>{tab===t&&<i/>}</button>)}</nav>
+      <div className="side-label">WORKSPACE</div><nav>{tabs.map((t,i)=><button key={t} className={tab===t?'nav-item active':'nav-item'} onClick={()=>setTab(t)}>{[<Gauge/>,<Activity/>,<Award/>,<FileUp/>,<Target/>][i]}<span>{t}</span>{tab===t&&<i/>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="user-chip"><div className="avatar">{session.user.email?.[0]?.toUpperCase()}</div><div className="user-info"><b>{session.user.email?.split('@')[0]}</b><span>Swimmer</span></div><button className="icon-btn" title="Sign out" onClick={()=>supabase.auth.signOut()}><LogOut size={17}/></button></div></div>
     </aside>
     <main className="main-content">
@@ -110,6 +147,7 @@ export default function App() {
         <section className="panel best-strip"><div className="panel-heading"><div><p className="eyebrow">PERSONAL RECORDS</p><h3>Best times</h3></div><button className="text-btn" onClick={()=>setTab('Best Times')}>All bests <ArrowUpRight size={14}/></button></div><div className="best-cards">{bests.slice(0,3).map(b=><div className="best-card" key={b.id}><span>{b.event}</span><b>{fmt(b.time_seconds)}</b><small>{b.course} · {dateLabel(b.achieved_on)}</small></div>)}{!bests.length&&<Empty text="Add a personal best to start your record board."/>}</div></section></>}
       {tab==='Workouts'&&<section className="panel page-panel"><div className="panel-heading"><div><p className="eyebrow">THE WORK YOU PUT IN</p><h3>Swim history</h3></div><button className="primary-btn" onClick={()=>setModal('swim')}><Plus size={16}/> Log swim</button></div>{sessions.length?sessions.map(s=><SessionRow key={s.id} item={s} detailed/>):<Empty text="No sessions yet. Log your first workout to get started."/>}</section>}
       {tab==='Best Times'&&<section className="panel page-panel"><div className="panel-heading"><div><p className="eyebrow">THE TIMES THAT DEFINE PROGRESS</p><h3>Personal bests</h3></div><button className="primary-btn" onClick={()=>setModal('best')}><Plus size={16}/> Add best time</button></div>{bests.length?<div className="record-grid">{bests.map(b=><div className="record-card" key={b.id}><Award size={20}/><span>{b.event}</span><strong>{fmt(b.time_seconds)}</strong><small>{b.course} · {dateLabel(b.achieved_on)}</small></div>)}</div>:<Empty text="Your next personal best starts here. Add a time you want to track."/>}</section>}
+      {tab==='Meet Results'&&<section className="panel page-panel"><div className="panel-heading"><div><p className="eyebrow">OFFICIAL MEET PERFORMANCE</p><h3>Meet results</h3></div><button className="primary-btn" onClick={()=>setModal('meet')}><Plus size={16}/> Import results</button></div><p className="muted meet-help">Bring in times from MaxPreps or another team results page. Paste the results and save the source link so every time stays traceable.</p>{meetResults.length?<div className="meet-result-list">{meetResults.map(r=><div className="meet-result-row" key={r.id}><div className="meet-result-main"><b>{r.event}</b><span>{r.meet_name||'Swim meet'} · {dateLabel(r.meet_date)} · {r.course}</span>{r.source_url&&<a href={r.source_url} target="_blank" rel="noreferrer">{r.source_name||'Source'} ↗</a>}</div><strong>{fmt(r.time_seconds)}</strong></div>)}</div>:<Empty text="Your meet results will appear here after you import your first result."/>}</section>}
       {tab==='Goals'&&<section className="panel page-panel"><div className="panel-heading"><div><p className="eyebrow">A TARGET TO CHASE</p><h3>Your swim goals</h3></div><button className="primary-btn" onClick={()=>setModal('goal')}><Plus size={16}/> Add goal</button></div>{goals.length?<div className="goal-list">{goals.map(g=>{const raw=String(g.unit).toLowerCase().includes('second') ? Number(g.target_value)/Number(g.current_value)*100 : Number(g.current_value)/Number(g.target_value)*100; const pct=Math.min(100,Math.max(0,Math.round(raw||0)));return <div className="goal-card" key={g.id}><div className="goal-top"><div><span className="goal-kicker">TARGET EVENT</span><h4>{g.title}</h4></div><b>{pct}%</b></div><div className="progress"><i style={{width:pct+'%'}}/></div><div className="goal-meta"><span>Current: {g.current_value} {g.unit}</span><span>Target: {g.target_value} {g.unit}</span></div></div>})}</div>:<Empty text="Set a goal, then use each session to move toward it."/>}</section>}
       <footer className="footer"><span>LANELINE / 2026</span><span>PROGRESS IS BUILT IN THE WATER.</span></footer>
     </main>
@@ -122,6 +160,14 @@ export default function App() {
     </form></Modal>}
     {modal==='best'&&<Modal title="Add a personal best" onClose={()=>setModal('')}><form className="modal-form" onSubmit={e=>{e.preventDefault();save('personal_bests',{...best,time_seconds:Number(best.time_seconds)},()=>setBest({...best,time_seconds:'75.00'}))}}>
       <label>Event<input required value={best.event} onChange={e=>setBest({...best,event:e.target.value})} placeholder="100 Breast"/></label><div className="form-row"><label>Time (seconds)<input type="number" step="0.01" min="0.01" required value={best.time_seconds} onChange={e=>setBest({...best,time_seconds:e.target.value})}/></label><label>Course<select value={best.course} onChange={e=>setBest({...best,course:e.target.value})}><option>SCY</option><option>SCM</option><option>LCM</option></select></label></div><label>Date achieved<input type="date" value={best.achieved_on} onChange={e=>setBest({...best,achieved_on:e.target.value})}/></label><button className="primary-btn wide" disabled={busy}>{busy?'Saving…':'Save personal best'}</button>
+    </form></Modal>}
+    {modal==='meet'&&<Modal title="Import meet results" onClose={()=>setModal('')}><form className="modal-form" onSubmit={importMeetResults}>
+      <div className="notice">Paste results copied from your meet results page. LaneLine will save each swim and automatically update a personal best when the time is faster for the same event and course.</div>
+      <label>Results website<select value={meetImport.source_name} onChange={e=>setMeetImport({...meetImport,source_name:e.target.value})}><option>MaxPreps</option><option>SwimCloud</option><option>Meet Mobile</option><option>Team website</option><option>Other</option></select></label>
+      <label>Link to the results page <span className="optional">optional</span><input type="url" value={meetImport.source_url} onChange={e=>setMeetImport({...meetImport,source_url:e.target.value})} placeholder="https://…"/></label>
+      <label>Paste results <span className="optional">one swim per line</span><textarea required rows="6" value={meetImport.rows} onChange={e=>setMeetImport({...meetImport,rows:e.target.value})} placeholder={'100 Breast, 1:12.45, SCY, 2026-11-20, Evanston Invite\\n200 IM, 2:18.30, SCY, 2026-11-20, Evanston Invite'}/></label>
+      <p className="muted import-format">Format: Event, Time, Course, Date (YYYY-MM-DD), Meet name. Time can be 72.45 or 1:12.45.</p>
+      <button className="primary-btn wide" disabled={busy}>{busy?'Importing…':'Import results & update bests'}</button>
     </form></Modal>}
     {modal==='goal'&&<Modal title="Set a swim goal" onClose={()=>setModal('')}><form className="modal-form" onSubmit={e=>{e.preventDefault();save('swim_goals',{...goal,target_value:Number(goal.target_value),current_value:Number(goal.current_value),target_date:goal.target_date||null},()=>setGoal({...goal,title:'',target_value:'',current_value:'0'}))}}>
       <label>Goal / event<input required value={goal.title} onChange={e=>setGoal({...goal,title:e.target.value})} placeholder="100 Breast"/></label><div className="form-row"><label>Current value<input type="number" step="0.01" required value={goal.current_value} onChange={e=>setGoal({...goal,current_value:e.target.value})}/></label><label>Target value<input type="number" step="0.01" required value={goal.target_value} onChange={e=>setGoal({...goal,target_value:e.target.value})}/></label></div><label>Unit<input required value={goal.unit} onChange={e=>setGoal({...goal,unit:e.target.value})} placeholder="seconds"/></label><label>Target date <span className="optional">optional</span><input type="date" value={goal.target_date} onChange={e=>setGoal({...goal,target_date:e.target.value})}/></label><button className="primary-btn wide" disabled={busy}>{busy?'Saving…':'Save goal'}</button>
