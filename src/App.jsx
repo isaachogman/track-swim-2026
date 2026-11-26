@@ -106,17 +106,21 @@ export default function App() {
       setToast('Check the pasted rows. Use: Event, Time, Course, YYYY-MM-DD, Meet name'); return;
     }
     setBusy(true);
+    const bestMap = new Map(bests.map(b=>[b.event.toLowerCase()+'|'+b.course,b]));
     for (const item of parsed) {
       const {error}=await supabase.from('meet_results').insert({...item,user_id:session.user.id});
       if (error) { setBusy(false); setToast(error.message); return; }
-      const existing = bests.filter(b=>b.event.toLowerCase()===item.event.toLowerCase() && b.course===item.course).sort((a,b)=>Number(a.time_seconds)-Number(b.time_seconds))[0];
+      const bestKey = item.event.toLowerCase()+'|'+item.course;
+      const existing = bestMap.get(bestKey);
       if (!existing || item.time_seconds < Number(existing.time_seconds)) {
         if (existing) {
           const {error:updateError}=await supabase.from('personal_bests').update({time_seconds:item.time_seconds,achieved_on:item.meet_date}).eq('id',existing.id);
           if (updateError) { setBusy(false); setToast(updateError.message); return; }
+          bestMap.set(bestKey,{...existing,time_seconds:item.time_seconds,achieved_on:item.meet_date});
         } else {
-          const {error:insertError}=await supabase.from('personal_bests').insert({user_id:session.user.id,event:item.event,course:item.course,time_seconds:item.time_seconds,achieved_on:item.meet_date});
+          const {data:inserted,error:insertError}=await supabase.from('personal_bests').insert({user_id:session.user.id,event:item.event,course:item.course,time_seconds:item.time_seconds,achieved_on:item.meet_date}).select().single();
           if (insertError) { setBusy(false); setToast(insertError.message); return; }
+          bestMap.set(bestKey,inserted);
         }
       }
     }
