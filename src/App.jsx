@@ -10,7 +10,7 @@ const fmt = (seconds) => {
 };
 const dateLabel = (d) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-function AuthScreen() {
+function AuthScreen({ onDemo }) {
   const [mode, setMode] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,6 +18,7 @@ function AuthScreen() {
   const [message, setMessage] = useState('');
   async function submit(e) {
     e.preventDefault(); setBusy(true); setMessage('');
+    if (!supabase) { setBusy(false); setMessage('Account sign-in is unavailable right now. Try the interactive demo below.'); return; }
     const result = mode === 'signin'
       ? await supabase.auth.signInWithPassword({ email, password })
       : await supabase.auth.signUp({ email, password });
@@ -35,6 +36,7 @@ function AuthScreen() {
       {message && <p className="notice">{message}</p>}
       <button className="primary-btn wide" disabled={busy}>{busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}</button>
     </form>
+    <button type="button" className="demo-btn" onClick={onDemo}>Explore interactive demo <ArrowUpRight size={15}/></button>
     <p className="auth-switch">{mode === 'signin' ? 'New here?' : 'Already have an account?'} <button onClick={()=>{setMode(mode==='signin'?'signup':'signin');setMessage('')}}>{mode === 'signin' ? 'Create an account' : 'Sign in'}</button></p>
   </div><div className="auth-foot">LANELINE <span>·</span> BUILT FOR THE NEXT PERSONAL BEST</div></main>;
 }
@@ -47,6 +49,7 @@ function Modal({ title, onClose, children }) {
 
 export default function App() {
   const [session, setSession] = useState(null);
+  const [demoMode, setDemoMode] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [tab, setTab] = useState('Overview');
   const [sessions, setSessions] = useState([]);
@@ -68,7 +71,7 @@ export default function App() {
     return ()=>data.subscription.unsubscribe();
   }, []);
   async function loadData() {
-    if (!session?.user) return;
+    if (!session?.user || demoMode) return;
     const [s,b,g,m] = await Promise.all([
       supabase.from('swim_sessions').select('*').order('swim_date',{ascending:false}).limit(100),
       supabase.from('personal_bests').select('*').order('achieved_on',{ascending:false}),
@@ -78,7 +81,22 @@ export default function App() {
     if (s.error || b.error || g.error || m.error) setToast((s.error||b.error||g.error||m.error).message);
     setSessions(s.data||[]); setBests(b.data||[]); setGoals(g.data||[]); setMeetResults(m.data||[]);
   }
-  useEffect(()=>{loadData()},[session]);
+  useEffect(()=>{loadData()},[session, demoMode]);
+  function startDemo() {
+    setDemoMode(true);
+    const demoSession={user:{id:'laneline-demo',email:'demo@laneline.app'}};
+    setSession(demoSession);
+    const stored=localStorage.getItem('laneline-demo-data');
+    if (stored) { const d=JSON.parse(stored); setSessions(d.sessions||[]); setBests(d.bests||[]); setGoals(d.goals||[]); setMeetResults(d.meetResults||[]); }
+    else {
+      const sampleSessions=[{id:'d1',swim_date:'2026-11-24',pool_length:'25 yd',distance_yards:2400,stroke:'Breaststroke',duration_seconds:3600,notes:'Technique + pace work'},{id:'d2',swim_date:'2026-11-22',pool_length:'25 yd',distance_yards:2100,stroke:'IM',duration_seconds:3300,notes:'200 IM focus'},{id:'d3',swim_date:'2026-11-20',pool_length:'25 yd',distance_yards:2600,stroke:'Breaststroke',duration_seconds:3900,notes:'Race pace sets'}];
+      const sampleBests=[{id:'b1',event:'100 Breast',course:'SCY',time_seconds:75.18,achieved_on:'2026-11-20'},{id:'b2',event:'200 IM',course:'SCY',time_seconds:138.42,achieved_on:'2026-11-20'},{id:'b3',event:'50 Free',course:'SCY',time_seconds:25.91,achieved_on:'2026-11-18'}];
+      const sampleGoals=[{id:'g1',title:'100 Breast',current_value:75.18,target_value:73,unit:'seconds',target_date:'2027-02-01'}];
+      const sampleResults=[{id:'r1',event:'100 Breast',time_seconds:75.18,course:'SCY',meet_date:'2026-11-20',meet_name:'Evanston Invite',source_name:'MaxPreps',source_url:''},{id:'r2',event:'200 IM',time_seconds:138.42,course:'SCY',meet_date:'2026-11-20',meet_name:'Evanston Invite',source_name:'MaxPreps',source_url:''}];
+      setSessions(sampleSessions);setBests(sampleBests);setGoals(sampleGoals);setMeetResults(sampleResults);
+      localStorage.setItem('laneline-demo-data',JSON.stringify({sessions:sampleSessions,bests:sampleBests,goals:sampleGoals,meetResults:sampleResults}));
+    }
+  }
   const totalYards = sessions.reduce((n,s)=>n+Number(s.distance_yards||0),0);
   const thisWeek = sessions.filter(s => {
     const d = new Date(s.swim_date+'T12:00:00'); const now = new Date(); const start = new Date(now); start.setDate(now.getDate()-now.getDay()); start.setHours(0,0,0,0); return d>=start;
@@ -106,6 +124,12 @@ export default function App() {
       setToast('Check the pasted rows. Use: Event, Time, Course, YYYY-MM-DD, Meet name'); return;
     }
     setBusy(true);
+    if (demoMode) {
+      const nextResults=[...parsed.map((x,i)=>({...x,id:'demo-'+Date.now()+'-'+i})),...meetResults];
+      const nextBests=[...bests];
+      parsed.forEach(item=>{const idx=nextBests.findIndex(b=>b.event.toLowerCase()===item.event.toLowerCase()&&b.course===item.course);if(idx<0)nextBests.push({...item,id:'best-'+Date.now()+Math.random()});else if(item.time_seconds<Number(nextBests[idx].time_seconds))nextBests[idx]={...nextBests[idx],time_seconds:item.time_seconds,achieved_on:item.meet_date};});
+      setMeetResults(nextResults);setBests(nextBests);localStorage.setItem('laneline-demo-data',JSON.stringify({sessions,bests:nextBests,goals,meetResults:nextResults}));setBusy(false);setModal('');setMeetImport({...meetImport,rows:''});setToast(parsed.length+' meet result(s) imported. Personal bests updated.');return;
+    }
     const bestMap = new Map(bests.map(b=>[b.event.toLowerCase()+'|'+b.course,b]));
     for (const item of parsed) {
       const {error}=await supabase.from('meet_results').insert({...item,user_id:session.user.id});
@@ -128,18 +152,25 @@ export default function App() {
     setTimeout(()=>setToast(''),4500);
   }
   async function save(table, value, reset) {
-    setBusy(true); const {error}=await supabase.from(table).insert({...value,user_id:session.user.id});
+    setBusy(true);
+    if (demoMode) {
+      const item={...value,id:'demo-'+Date.now()};
+      const nextSessions=table==='swim_sessions'?[item,...sessions]:sessions;
+      const nextBests=table==='personal_bests'?[item,...bests]:bests;
+      const nextGoals=table==='swim_goals'?[item,...goals]:goals;
+      setSessions(nextSessions);setBests(nextBests);setGoals(nextGoals);localStorage.setItem('laneline-demo-data',JSON.stringify({sessions:nextSessions,bests:nextBests,goals:nextGoals,meetResults}));setBusy(false);setModal('');reset();setToast('Saved in this demo on this device.');return;
+    }
+    const {error}=await supabase.from(table).insert({...value,user_id:session.user.id});
     setBusy(false); if(error){setToast(error.message);return;}
     setModal(''); reset(); await loadData(); setToast('Saved to your swim log.');
     setTimeout(()=>setToast(''),3000);
   }
   if (!authReady) return <div className="loading">Loading LaneLine…</div>;
-  if (!supabase) return <main className="auth-shell"><div className="auth-card"><div className="brand-mark"><Waves/></div><h1>One quick setup step.</h1><p className="muted">The app is coded, but its Supabase connection still needs to be added to the deployment environment.</p></div></main>;
-  if (!session) return <AuthScreen />;
+  if (!session) return <AuthScreen onDemo={startDemo}/>;
   return <div className="app-shell">
     <aside className="sidebar"><div className="brand"><div className="brand-mark small"><Waves size={19}/></div><span>lane<span className="brand-light">line</span></span></div>
       <div className="side-label">WORKSPACE</div><nav>{tabs.map((t,i)=><button key={t} className={tab===t?'nav-item active':'nav-item'} onClick={()=>setTab(t)}>{[<Gauge/>,<Activity/>,<Award/>,<FileUp/>,<Target/>][i]}<span>{t}</span>{tab===t&&<i/>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="user-chip"><div className="avatar">{session.user.email?.[0]?.toUpperCase()}</div><div className="user-info"><b>{session.user.email?.split('@')[0]}</b><span>Swimmer</span></div><button className="icon-btn" title="Sign out" onClick={()=>supabase.auth.signOut()}><LogOut size={17}/></button></div></div>
+      <div className="sidebar-bottom"><div className="user-chip"><div className="avatar">{session.user.email?.[0]?.toUpperCase()}</div><div className="user-info"><b>{session.user.email?.split('@')[0]}</b><span>Swimmer</span></div><button className="icon-btn" title="Sign out" onClick={()=>{if(demoMode){setDemoMode(false);setSession(null);setTab('Overview')}else supabase?.auth.signOut()}}><LogOut size={17}/></button></div></div>
     </aside>
     <main className="main-content">
       <header className="topbar"><div><p className="eyebrow">TRAINING DASHBOARD</p><h1>{tab==='Overview'?'Good to see you back.':tab}</h1></div><div className="top-actions"><span className="date-pill"><CalendarDays size={15}/>{new Date().toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</span><button className="primary-btn" onClick={()=>setModal('swim')}><Plus size={17}/> Log a swim</button></div></header>
