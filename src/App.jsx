@@ -97,12 +97,12 @@ export default function App() {
   }
   async function importMeetResults(e) {
     e.preventDefault();
-    const lines = meetImport.rows.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+    const lines = meetImport.rows.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
     const parsed = lines.map(line => {
       const parts = line.split(',').map(x=>x.trim());
       return { event:parts[0], time_seconds:parseSwimTime(parts[1]), course:(parts[2]||'SCY').toUpperCase(), meet_date:parts[3]||new Date().toISOString().slice(0,10), meet_name:parts[4]||'Swim meet', source_name:meetImport.source_name||'Other', source_url:meetImport.source_url||null };
     });
-    if (!parsed.length || parsed.some(x=>!x.event || !Number.isFinite(x.time_seconds) || x.time_seconds<=0 || !['SCY','SCM','LCM'].includes(x.course) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(x.meet_date))) {
+    if (!parsed.length || parsed.some(x=>!x.event || !Number.isFinite(x.time_seconds) || x.time_seconds<=0 || !['SCY','SCM','LCM'].includes(x.course) || !/^\d{4}-\d{2}-\d{2}$/.test(x.meet_date))) {
       setToast('Check the pasted rows. Use: Event, Time, Course, YYYY-MM-DD, Meet name'); return;
     }
     setBusy(true);
@@ -165,7 +165,7 @@ export default function App() {
       <div className="notice">Paste results copied from your meet results page. LaneLine will save each swim and automatically update a personal best when the time is faster for the same event and course.</div>
       <label>Results website<select value={meetImport.source_name} onChange={e=>setMeetImport({...meetImport,source_name:e.target.value})}><option>MaxPreps</option><option>SwimCloud</option><option>Meet Mobile</option><option>Team website</option><option>Other</option></select></label>
       <label>Link to the results page <span className="optional">optional</span><input type="url" value={meetImport.source_url} onChange={e=>setMeetImport({...meetImport,source_url:e.target.value})} placeholder="https://…"/></label>
-      <label>Paste results <span className="optional">one swim per line</span><textarea required rows="6" value={meetImport.rows} onChange={e=>setMeetImport({...meetImport,rows:e.target.value})} placeholder={'100 Breast, 1:12.45, SCY, 2026-11-20, Evanston Invite\\n200 IM, 2:18.30, SCY, 2026-11-20, Evanston Invite'}/></label>
+      <label>Paste results <span className="optional">one swim per line</span><textarea required rows="6" value={meetImport.rows} onChange={e=>setMeetImport({...meetImport,rows:e.target.value})} placeholder={'100 Breast, 1:12.45, SCY, 2026-11-20, Evanston Invite\n200 IM, 2:18.30, SCY, 2026-11-20, Evanston Invite'}/></label>
       <p className="muted import-format">Format: Event, Time, Course, Date (YYYY-MM-DD), Meet name. Time can be 72.45 or 1:12.45.</p>
       <button className="primary-btn wide" disabled={busy}>{busy?'Importing…':'Import results & update bests'}</button>
     </form></Modal>}
