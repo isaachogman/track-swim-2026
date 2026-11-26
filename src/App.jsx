@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownRight, ArrowUpRight, Award, CalendarDays, Check, ChevronDown, Clock3, Droplets, Gauge, LogOut, Plus, Target, Timer, Waves, X } from 'lucide-react';
+import { Activity, ArrowDownRight, ArrowUpRight, Award, CalendarDays, Check, ChevronDown, Clock3, Droplets, Gauge, FileUp, LogOut, Plus, Target, Timer, Waves, X } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
 const tabs = ['Overview', 'Workouts', 'Best Times', 'Meet Results', 'Goals'];
