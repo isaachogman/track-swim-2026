@@ -3,7 +3,7 @@ const SYSTEM = "You are JARVIS, a clear, capable, calm personal AI assistant. He
 export default async function handler(req,res){
  if(req.method!=="POST"){res.setHeader("Allow","POST");return res.status(405).json({error:"Method not allowed"});}
  const origin=req.headers.origin; if(origin&&origin!==`https://${req.headers.host}`&&origin!==`http://${req.headers.host}`)return res.status(403).json({error:"Origin not allowed"});
- const supabaseUrl=process.env.SUPABASE_URL||process.env.VITE_SUPABASE_URL;const anon=process.env.SUPABASE_ANON_KEY||process.env.VITE_SUPABASE_ANON_KEY;const token=(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
+ const supabaseUrl=process.env.SUPABASE_URL||process.env.VITE_SUPABASE_URL;const anon=process.env.SUPABASE_ANON_KEY||process.env.VITE_SUPABASE_ANON_KEY||process.env.VITE_SUPABASE_PUBLISHABLE_KEY;const token=(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
  if(!supabaseUrl||!anon||!token)return res.status(401).json({error:"Sign in is required."});
  try{const check=await fetch(`${supabaseUrl}/auth/v1/user`,{headers:{apikey:anon,Authorization:`Bearer ${token}`}});if(!check.ok)return res.status(401).json({error:"Your session expired. Please sign in again."});}catch{return res.status(503).json({error:"Could not verify your account."});}
  const key=process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN;if(!key)return res.status(503).json({error:"The AI connection is not configured yet. The app is deployed, but its private AI Gateway credential still needs to be enabled in Vercel."});
