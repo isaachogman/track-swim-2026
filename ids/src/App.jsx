@@ -245,7 +245,13 @@ export default function App() {
     setAuthBusy(false);
     if (result.error) setAuthError(result.error.message);
     else if (authMode === 'signup' && !result.data.session) setAuthError('Check your email to confirm your account, then sign in.');
-    else { setShowAuth(false); setAuthPassword(''); notify('Welcome to IDS'); }
+    else {
+      if (authMode === 'signup' && result.data.user) {
+        const { error: usernameError } = await supabase.from('ids_profiles').update({username:authUsername.trim().toLowerCase()}).eq('id',result.data.user.id);
+        if (usernameError) notify('Account created. You can choose an available username in Profile.');
+      }
+      setShowAuth(false); setAuthPassword(''); notify('Welcome to IDS');
+    }
   }
 
   async function submitPost(e) {
