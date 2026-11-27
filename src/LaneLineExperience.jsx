@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, Award, Bell, BookOpen, ChartNoAxesCombined, Check, ChevronRight, CirclePlay, Crown, Droplets, Flag, Gauge, Medal, Plus, Search, Settings, Shield, Sparkles, Target, Timer, Trophy, Waves, X, LogOut } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import './laneline.css';
