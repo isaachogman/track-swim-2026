@@ -6,6 +6,29 @@
     <meta name="theme-color" content="#071522" />
     <meta name="description" content="A personal swim training tracker." />
     <title>LaneLine — Swim Progress</title>
+    <style>
+      html,body{margin:0;min-height:100%;background:#071522;color:#eaf3f8;font-family:Arial,sans-serif}
+      #root:empty{min-height:100vh;display:grid;place-items:center}
+      .boot-card{max-width:440px;margin:24px;padding:24px;border:1px solid #244765;border-radius:14px;background:#0b1b2d}
+      .boot-card b{color:#39baff;letter-spacing:2px;font-size:12px}
+      .boot-card p{color:#b6c9dc;line-height:1.6;font-size:14px}
+    </style>
+    <script>
+      (function(){
+        function showError(message){
+          var root=document.getElementById('root');
+          if(!root || root.dataset.lanelineErrorShown==='1') return;
+          root.dataset.lanelineErrorShown='1';
+          root.innerHTML='<main style="min-height:100vh;padding:24px;box-sizing:border-box;display:grid;place-items:center"><section class="boot-card"><b>LANELINE STARTUP ERROR</b><h1>LaneLine could not finish opening.</h1><p>The website reached your browser, but a script failed before the app could appear. Please send this error text:</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere;color:#ffd3a8;background:#06101d;padding:12px;border-radius:8px;font-size:12px"></pre><button onclick="location.reload()" style="background:#087fe8;color:white;border:0;border-radius:8px;padding:12px 16px;font-weight:bold">Reload LaneLine</button></section></main>';
+          root.querySelector('pre').textContent=String(message||'Unknown startup error');
+        }
+        window.addEventListener('error',function(event){showError(event.message || (event.target && event.target.src) || 'Script loading error');});
+        window.addEventListener('unhandledrejection',function(event){showError(event.reason && (event.reason.message || event.reason) || 'Unhandled promise rejection');});
+      })();
+    </script>
   </head>
-  <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
+  <body>
+    <div id="root"><main class="boot-card"><b>LANELINE</b><h1>Loading your swim dashboard…</h1><p>If this screen does not change, LaneLine will show a diagnostic message instead of leaving you with a blank page.</p></main></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
