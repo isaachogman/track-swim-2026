@@ -68,7 +68,7 @@ function Modal({title,onClose,children}) { return <div className="ll-modal-back"
 export default function LaneLineExperience() {
   const [session,setSession]=useState(null),[authReady,setAuthReady]=useState(false),[demoMode,setDemoMode]=useState(false);
   const [authMode,setAuthMode]=useState('signin'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[authError,setAuthError]=useState('');
-  const [tab,setTab]=useState('Overview'),[unit,setUnit]=useState('yd'),[sessions,setSessions]=useState([]),[bests,setBests]=useState([]),[goals,setGoals]=useState([]),[meets,setMeets]=useState([]);
+  const [tab,setTab]=useState('Video Lab'),[unit,setUnit]=useState('yd'),[sessions,setSessions]=useState([]),[bests,setBests]=useState([]),[goals,setGoals]=useState([]),[meets,setMeets]=useState([]);
   const [videoFilter,setVideoFilter]=useState('For You');
   const [savedVideos,setSavedVideos]=useState(()=>{try{return JSON.parse(localStorage.getItem('laneline-saved-videos')||'[]')}catch{return []}});
   const [likedVideos,setLikedVideos]=useState([]);
@@ -122,9 +122,9 @@ export default function LaneLineExperience() {
   async function signIn(e){
     e.preventDefault();setBusy(true);setAuthError('');
     if(!supabase){setBusy(false);setAuthError('Sign-in is not configured yet. You can explore the demo below.');return;}
-    const {error}=authMode==='signin'?await supabase.auth.signInWithPassword({email,password}):await supabase.auth.signUp({email,password});
+    const {data,error}=authMode==='signin'?await supabase.auth.signInWithPassword({email,password}):await supabase.auth.signUp({email,password});
     setBusy(false);if(error)setAuthError(error.message);
-    else if(authMode==='signup')setAuthError('Check your email for a confirmation link, then sign in.');
+    else if(authMode==='signup'&&!data.session)setAuthError('Account created. Check your email to confirm it, then sign in.');
   }
   async function saveRow(table,value,localSetter,localList,key){
     setBusy(true);
@@ -220,8 +220,8 @@ export default function LaneLineExperience() {
         <div className="ll-reels-heading"><div><div className="ll-eyebrow">LANELINE / TECHNIQUE FEED</div><h2>SWIM <span>REELS</span></h2><p>Short, focused lessons. Scroll to the next technique and study the details.</p></div><div className="ll-reels-count">{videos.length} CLIPS</div></div>
         <div className="ll-reel-filters">{['For You','Breaststroke','Freestyle','Backstroke','Butterfly','Underwaters','Starts & Turns','Race Strategy','All Strokes','Saved'].map(x=><button key={x} className={videoFilter===x?'active':''} onClick={()=>setVideoFilter(x)}>{x}</button>)}</div>
         <div className="ll-reel-feed">
-          {videos.filter(v=>videoFilter==='For You'||(videoFilter==='Saved'?savedVideos.includes(v.id):v.category===videoFilter)).map(v=><article className="ll-reel-card" key={v.id}>
-            <div className="ll-reel-player"><iframe src={`https://www.youtube-nocookie.com/embed/${v.videoId}?start=${v.start}&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`} title={v.title} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/></div>
+          {videos.filter(v=>videoFilter==='For You'||(videoFilter==='Saved'?savedVideos.includes(v.id):v.category===videoFilter)).map((v,index)=><article className="ll-reel-card" key={v.id}>
+            <div className="ll-reel-player"><iframe src={`https://www.youtube-nocookie.com/embed/${v.videoId}?start=${v.start}&autoplay=${index===0?1:0}&mute=1&playsinline=1&rel=0&modestbranding=1`} title={v.title} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen/></div>
             <div className="ll-reel-overlay"><span className="ll-reel-tag">{v.tag}</span><div className="ll-reel-actions"><button aria-label="Like video" className={likedVideos.includes(v.id)?'selected':''} onClick={()=>toggleLikedVideo(v.id)}><Heart fill={likedVideos.includes(v.id)?'currentColor':'none'}/><small>{likedVideos.includes(v.id)?'LIKED':'LIKE'}</small></button><button aria-label="Save video" className={savedVideos.includes(v.id)?'selected':''} onClick={()=>toggleSavedVideo(v.id)}><Bookmark fill={savedVideos.includes(v.id)?'currentColor':'none'}/><small>{savedVideos.includes(v.id)?'SAVED':'SAVE'}</small></button></div></div>
             <div className="ll-reel-copy"><small>{v.coach} · TECHNIQUE BREAKDOWN</small><h3>{v.title}</h3><p>{v.tip}</p></div>
           </article>)}
