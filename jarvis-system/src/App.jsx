@@ -3,7 +3,7 @@ import {createClient} from '@supabase/supabase-js';
 import {Activity,AudioLines,BrainCircuit,ChevronRight,Command,ExternalLink,LogOut,Mic,MicOff,Send,ShieldCheck,Smartphone,Volume2,VolumeX,Wifi,WifiOff} from 'lucide-react';
 
 const supabaseUrl=import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey=import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey=import.meta.env.VITE_SUPABASE_ANON_KEY||import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const supabase=supabaseUrl&&supabaseKey?createClient(supabaseUrl,supabaseKey):null;
 const starter=[{role:'assistant',content:'JARVIS online. I can help organize your day, think through projects, study, and work with your connected services once they are securely integrated. What should we tackle?'}];
 
