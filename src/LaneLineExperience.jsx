@@ -91,11 +91,15 @@ export default function LaneLineExperience() {
   const [meet,setMeet]=useState({source_name:'MaxPreps',source_url:'',meet_name:'',meet_date:new Date().toISOString().slice(0,10),rows:''});
 
   useEffect(()=>{
+    if(demoMode){
+      try{setAthleteProfile(JSON.parse(localStorage.getItem('laneline-demo-athlete')||'{}'));}catch{}
+      return;
+    }
     if(session?.user){
       const saved=session.user.user_metadata?.laneline_athlete_profile||{};
       setAthleteProfile({full_name:'',team_name:'',swimcloud_url:'',usaswimming_url:'',school_results_url:'',...saved});
     }
-  },[session?.user?.id]);
+  },[session?.user?.id,demoMode]);
   useEffect(()=>{
     if(!supabase){setAuthReady(true);return;}
     setAuthReady(true); let active=true;
