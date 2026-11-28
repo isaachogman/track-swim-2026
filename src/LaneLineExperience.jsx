@@ -51,11 +51,11 @@ const toSeconds = v => {
   if(!s)return NaN;
   if(s.includes(':')){
     const p=s.split(':');
-    if(p.length!==2 || !/^\\d+$/.test(p[0]) || !/^\\d{1,2}(?:\\.\\d{1,2})?$/.test(p[1]))return NaN;
+    if(p.length!==2 || !/^\d+$/.test(p[0]) || !/^\d{1,2}(?:\.\d{1,2})?$/.test(p[1]))return NaN;
     const sec=Number(p[1]);if(sec>=60)return NaN;
     return Number(p[0])*60+sec;
   }
-  return /^\\d+(?:\\.\\d{1,2})?$/.test(s)?Number(s):NaN;
+  return /^\d+(?:\.\d{1,2})?$/.test(s)?Number(s):NaN;
 };
 const safeHttpUrl = value => {
   try { const u=new URL(String(value||'')); return ['http:','https:'].includes(u.protocol)?u.href:''; } catch { return ''; }
@@ -236,7 +236,7 @@ export default function LaneLineExperience() {
       {tab==='Goals'&&<Card><Header eyebrow="QUALIFICATION + PERSONAL TARGETS" title="Your goals" action={<button className="ll-primary" onClick={()=>setModal('goal')}><Plus size={16}/> ADD GOAL</button>}/>{goals.length?<div className="ll-goal-list">{goals.map(g=>{const time=String(g.unit).toLowerCase().includes('second'),pct=time?Number(g.target_value)/Math.max(.01,Number(g.current_value))*100:Number(g.current_value)/Math.max(.01,Number(g.target_value))*100;const away=time?Math.max(0,Number(g.current_value)-Number(g.target_value)):null;return <div className="ll-goal" key={g.id}><div className="ll-goal-top"><div><small>EVENT / QUALIFYING STANDARD</small><h3>{g.title}</h3></div><b>{Math.min(100,Math.round(pct))}%</b></div><div className="ll-progress"><i style={{width:Math.min(100,Math.max(0,pct))+'%'}}/></div><div className="ll-goal-foot"><span>Current {time?fmt(g.current_value):g.current_value}</span><span>Target {time?fmt(g.target_value):g.target_value}</span></div>{time&&<p className="ll-muted">{away.toFixed(2)} seconds to go</p>}</div>})}</div>:<Empty text="Set a personal goal or enter a state qualifying standard."/>}<div className="ll-info ll-mt">Qualification times shown are only as accurate as the standards you enter. Confirm current state and championship standards with your swim association or coach.</div></Card>}
       {tab==='Video Lab'&&<section className="ll-reels-page">
         <div className="ll-reels-heading"><div><div className="ll-eyebrow">LANELINE / TECHNIQUE FEED</div><h2>SWIM <span>REELS</span></h2><p>Tap a clip to play it in LaneLine, without leaving this screen.</p></div><div className="ll-reels-count">{videos.length} CLIPS</div></div>
-        <div className="ll-reel-filters">{['For You','Breaststroke','Freestyle','Backstroke','Butterfly','Underwaters','Starts & Turns','Race Strategy','All Strokes','Saved'].map(x=><button key={x} className={videoFilter===x?'active':''} onClick={()=>setVideoFilter(x)}>{x}</button>)}</div>
+        <div className="ll-reel-filters">{['For You','Breaststroke','Freestyle','Backstroke','Butterfly','Underwaters','Starts & Turns','Saved'].map(x=><button key={x} className={videoFilter===x?'active':''} onClick={()=>setVideoFilter(x)}>{x}</button>)}</div>
         <div className="ll-reel-feed">
           {videos.filter(v=>videoFilter==='For You'||(videoFilter==='Saved'?savedVideos.includes(v.id):v.category===videoFilter)).map(v=><article className="ll-reel-card" key={v.id}>
             <button className="ll-reel-thumb" onClick={()=>setActiveVideo(v)} aria-label={'Play '+v.title}>
