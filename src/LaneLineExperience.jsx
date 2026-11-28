@@ -69,7 +69,9 @@ export default function LaneLineExperience() {
   const [session,setSession]=useState(null),[authReady,setAuthReady]=useState(false),[demoMode,setDemoMode]=useState(false);
   const [authMode,setAuthMode]=useState('signin'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[authError,setAuthError]=useState('');
   const [tab,setTab]=useState('Video Lab'),[unit,setUnit]=useState('yd'),[sessions,setSessions]=useState([]),[bests,setBests]=useState([]),[goals,setGoals]=useState([]),[meets,setMeets]=useState([]);
-  const [videoFilter,setVideoFilter]=useState('For You');\n  const [activeVideo,setActiveVideo]=useState(null);\n  const [athleteProfile,setAthleteProfile]=useState({full_name:'',team_name:'',swimcloud_url:'',usaswimming_url:'',school_results_url:''});
+  const [videoFilter,setVideoFilter]=useState('For You');
+  const [activeVideo,setActiveVideo]=useState(null);
+  const [athleteProfile,setAthleteProfile]=useState({full_name:'',team_name:'',swimcloud_url:'',usaswimming_url:'',school_results_url:''});
   const [savedVideos,setSavedVideos]=useState(()=>{try{return JSON.parse(localStorage.getItem('laneline-saved-videos')||'[]')}catch{return []}});
   const [likedVideos,setLikedVideos]=useState([]);
   function toggleSavedVideo(id){
@@ -119,7 +121,8 @@ export default function LaneLineExperience() {
     try{
       const saved=JSON.parse(localStorage.getItem('laneline-demo-data')||'null');
       const d=saved||demo;
-      setSessions(d.sessions||[]);setBests(d.bests||[]);setGoals(d.goals||[]);setMeets(d.meets||d.meetResults||[]);\n      try{setAthleteProfile(JSON.parse(localStorage.getItem('laneline-demo-athlete')||'{}'));}catch{}
+      setSessions(d.sessions||[]);setBests(d.bests||[]);setGoals(d.goals||[]);setMeets(d.meets||d.meetResults||[]);
+      try{setAthleteProfile(JSON.parse(localStorage.getItem('laneline-demo-athlete')||'{}'));}catch{}
     }catch{setSessions(demo.sessions);setBests(demo.bests);setGoals(demo.goals);setMeets(demo.meets);}
   }
   function persistDemo(next){
